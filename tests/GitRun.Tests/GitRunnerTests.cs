@@ -9,194 +9,194 @@ namespace GitRun.Tests;
 [TestFixture]
 public sealed class GitRunnerTests
 {
-    // Locate a temporary directory that is a valid git repository so we can run real commands.
-    private static string CreateTempGitRepo()
-    {
-        var dir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
-        Directory.CreateDirectory(dir);
-        RunGit("init", dir);
-        RunGit("config user.email \"test@example.com\"", dir);
-        RunGit("config user.name \"Test\"", dir);
-        RunGit("commit --allow-empty -m init", dir);
-        return dir;
-    }
+	// Locate a temporary directory that is a valid git repository so we can run real commands.
+	private static string CreateTempGitRepo()
+	{
+		var dir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+		Directory.CreateDirectory(dir);
+		RunGit("init", dir);
+		RunGit("config user.email \"test@example.com\"", dir);
+		RunGit("config user.name \"Test\"", dir);
+		RunGit("commit --allow-empty -m init", dir);
+		return dir;
+	}
 
-    private static void RunGit(string args, string workingDir)
-    {
-        var psi = new System.Diagnostics.ProcessStartInfo("git", args)
-        {
-            WorkingDirectory = workingDir,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-            CreateNoWindow = true,
-        };
-        using var p = System.Diagnostics.Process.Start(psi)!;
-        p.WaitForExit();
-    }
+	private static void RunGit(string args, string workingDir)
+	{
+		var psi = new System.Diagnostics.ProcessStartInfo("git", args)
+		{
+			WorkingDirectory = workingDir,
+			RedirectStandardOutput = true,
+			RedirectStandardError = true,
+			UseShellExecute = false,
+			CreateNoWindow = true,
+		};
+		using var p = System.Diagnostics.Process.Start(psi)!;
+		p.WaitForExit();
+	}
 
-    [Test]
-    public async Task RunAsync_ValidCommand_ReturnsLines()
-    {
-        var repoDir = CreateTempGitRepo();
-        try
-        {
-            var runner = new GitRunner(new GitRunnerOptions
-            {
-                WorkingDirectory = repoDir,
-                IncludeStandardError = false,
-                ThrowOnNonZeroExitCode = true,
-            });
+	[Test]
+	public async Task RunAsync_ValidCommand_ReturnsLines()
+	{
+		var repoDir = CreateTempGitRepo();
+		try
+		{
+			var runner = new GitRunner(new GitRunnerOptions
+			{
+				WorkingDirectory = repoDir,
+				IncludeStandardError = false,
+				ThrowOnNonZeroExitCode = true,
+			});
 
-            var lines = new List<string>();
-            await foreach (var line in runner.RunAsync("log --oneline"))
-            {
-                lines.Add(line);
-            }
+			var lines = new List<string>();
+			await foreach (var line in runner.RunAsync("log --oneline"))
+			{
+				lines.Add(line);
+			}
 
-            Assert.That(lines, Is.Not.Empty);
-        }
-        finally
-        {
-            Directory.Delete(repoDir, recursive: true);
-        }
-    }
+			Assert.That(lines, Is.Not.Empty);
+		}
+		finally
+		{
+			Directory.Delete(repoDir, recursive: true);
+		}
+	}
 
-    [Test]
-    public async Task RunAsync_WithWorkingDirectoryOverride_UsesOverride()
-    {
-        var repoDir = CreateTempGitRepo();
-        try
-        {
-            // The runner has NO working directory set; we pass it explicitly.
-            var runner = new GitRunner(new GitRunnerOptions
-            {
-                IncludeStandardError = false,
-                ThrowOnNonZeroExitCode = true,
-            });
+	[Test]
+	public async Task RunAsync_WithWorkingDirectoryOverride_UsesOverride()
+	{
+		var repoDir = CreateTempGitRepo();
+		try
+		{
+			// The runner has NO working directory set; we pass it explicitly.
+			var runner = new GitRunner(new GitRunnerOptions
+			{
+				IncludeStandardError = false,
+				ThrowOnNonZeroExitCode = true,
+			});
 
-            var lines = new List<string>();
-            await foreach (var line in runner.RunAsync("log --oneline", repoDir))
-            {
-                lines.Add(line);
-            }
+			var lines = new List<string>();
+			await foreach (var line in runner.RunAsync("log --oneline", repoDir))
+			{
+				lines.Add(line);
+			}
 
-            Assert.That(lines, Is.Not.Empty);
-        }
-        finally
-        {
-            Directory.Delete(repoDir, recursive: true);
-        }
-    }
+			Assert.That(lines, Is.Not.Empty);
+		}
+		finally
+		{
+			Directory.Delete(repoDir, recursive: true);
+		}
+	}
 
-    [Test]
-    public async Task RunAsync_NonZeroExitCode_ThrowsGitRunException()
-    {
-        var repoDir = CreateTempGitRepo();
-        try
-        {
-            var runner = new GitRunner(new GitRunnerOptions
-            {
-                WorkingDirectory = repoDir,
-                ThrowOnNonZeroExitCode = true,
-            });
+	[Test]
+	public async Task RunAsync_NonZeroExitCode_ThrowsGitRunException()
+	{
+		var repoDir = CreateTempGitRepo();
+		try
+		{
+			var runner = new GitRunner(new GitRunnerOptions
+			{
+				WorkingDirectory = repoDir,
+				ThrowOnNonZeroExitCode = true,
+			});
 
-            // "git this-command-does-not-exist" exits with code 1.
-            Assert.ThrowsAsync<GitRunException>(async () =>
-            {
-                await foreach (var _ in runner.RunAsync("this-command-does-not-exist")) { }
-            });
-        }
-        finally
-        {
-            Directory.Delete(repoDir, recursive: true);
-        }
-    }
+			// "git this-command-does-not-exist" exits with code 1.
+			Assert.ThrowsAsync<GitRunException>(async () =>
+			{
+				await foreach (var _ in runner.RunAsync("this-command-does-not-exist")) { }
+			});
+		}
+		finally
+		{
+			Directory.Delete(repoDir, recursive: true);
+		}
+	}
 
-    [Test]
-    public async Task RunAsync_NonZeroExitCode_DoesNotThrowWhenDisabled()
-    {
-        var repoDir = CreateTempGitRepo();
-        try
-        {
-            var runner = new GitRunner(new GitRunnerOptions
-            {
-                WorkingDirectory = repoDir,
-                ThrowOnNonZeroExitCode = false,
-            });
+	[Test]
+	public async Task RunAsync_NonZeroExitCode_DoesNotThrowWhenDisabled()
+	{
+		var repoDir = CreateTempGitRepo();
+		try
+		{
+			var runner = new GitRunner(new GitRunnerOptions
+			{
+				WorkingDirectory = repoDir,
+				ThrowOnNonZeroExitCode = false,
+			});
 
-            // Should not throw even though the command fails.
-            await foreach (var _ in runner.RunAsync("this-command-does-not-exist")) { }
-        }
-        finally
-        {
-            Directory.Delete(repoDir, recursive: true);
-        }
-    }
+			// Should not throw even though the command fails.
+			await foreach (var _ in runner.RunAsync("this-command-does-not-exist")) { }
+		}
+		finally
+		{
+			Directory.Delete(repoDir, recursive: true);
+		}
+	}
 
-    [Test]
-    public void RunAsync_CancellationRequested_StopsEnumeration()
-    {
-        var repoDir = CreateTempGitRepo();
-        try
-        {
-            var runner = new GitRunner(new GitRunnerOptions
-            {
-                WorkingDirectory = repoDir,
-                ThrowOnNonZeroExitCode = false,
-            });
+	[Test]
+	public void RunAsync_CancellationRequested_StopsEnumeration()
+	{
+		var repoDir = CreateTempGitRepo();
+		try
+		{
+			var runner = new GitRunner(new GitRunnerOptions
+			{
+				WorkingDirectory = repoDir,
+				ThrowOnNonZeroExitCode = false,
+			});
 
-            using var cts = new CancellationTokenSource();
-            cts.Cancel();
+			using var cts = new CancellationTokenSource();
+			cts.Cancel();
 
-            Assert.CatchAsync<OperationCanceledException>(async () =>
-            {
-                await foreach (var _ in runner.RunAsync("log --oneline", cts.Token)) { }
-            });
-        }
-        finally
-        {
-            Directory.Delete(repoDir, recursive: true);
-        }
-    }
+			Assert.CatchAsync<OperationCanceledException>(async () =>
+			{
+				await foreach (var _ in runner.RunAsync("log --oneline", cts.Token)) { }
+			});
+		}
+		finally
+		{
+			Directory.Delete(repoDir, recursive: true);
+		}
+	}
 
-    [Test]
-    public void GitRunException_ContainsCorrectProperties()
-    {
-        const string args = "gc --prune=now --aggressive";
-        const int exitCode = 128;
-        var ex = new GitRunException(args, exitCode);
+	[Test]
+	public void GitRunException_ContainsCorrectProperties()
+	{
+		const string args = "gc --prune=now --aggressive";
+		const int exitCode = 128;
+		var ex = new GitRunException(args, exitCode);
 
-        Assert.That(ex.Arguments, Is.EqualTo(args));
-        Assert.That(ex.ExitCode, Is.EqualTo(exitCode));
-        Assert.That(ex.Message, Does.Contain(args));
-        Assert.That(ex.Message, Does.Contain("128"));
-    }
+		Assert.That(ex.Arguments, Is.EqualTo(args));
+		Assert.That(ex.ExitCode, Is.EqualTo(exitCode));
+		Assert.That(ex.Message, Does.Contain(args));
+		Assert.That(ex.Message, Does.Contain("128"));
+	}
 
-    [Test]
-    public void GitRunnerOptions_Defaults_AreCorrect()
-    {
-        var opts = new GitRunnerOptions();
+	[Test]
+	public void GitRunnerOptions_Defaults_AreCorrect()
+	{
+		var opts = new GitRunnerOptions();
 
-        Assert.That(opts.GitExecutable, Is.EqualTo("git"));
-        Assert.That(opts.IncludeStandardError, Is.True);
-        Assert.That(opts.ThrowOnNonZeroExitCode, Is.True);
-        Assert.That(opts.WorkingDirectory, Is.Null);
-    }
+		Assert.That(opts.GitExecutable, Is.EqualTo("git"));
+		Assert.That(opts.IncludeStandardError, Is.True);
+		Assert.That(opts.ThrowOnNonZeroExitCode, Is.True);
+		Assert.That(opts.WorkingDirectory, Is.Null);
+	}
 
-    [TestCase(null)]
-    [TestCase("")]
-    [TestCase("   ")]
-    public void RunAsync_NullOrWhitespaceArguments_Throws(string? args)
-    {
-        var runner = new GitRunner();
+	[TestCase(null)]
+	[TestCase("")]
+	[TestCase("   ")]
+	public void RunAsync_NullOrWhitespaceArguments_Throws(string? args)
+	{
+		var runner = new GitRunner();
 
-        // null produces ArgumentNullException (a subtype of ArgumentException);
-        // empty/whitespace produces ArgumentException — CatchAsync accepts subtypes.
-        Assert.CatchAsync<ArgumentException>(async () =>
-        {
-            await foreach (var _ in runner.RunAsync(args!)) { }
-        });
-    }
+		// null produces ArgumentNullException (a subtype of ArgumentException);
+		// empty/whitespace produces ArgumentException — CatchAsync accepts subtypes.
+		Assert.CatchAsync<ArgumentException>(async () =>
+		{
+			await foreach (var _ in runner.RunAsync(args!)) { }
+		});
+	}
 }
 
