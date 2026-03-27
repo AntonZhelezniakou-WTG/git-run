@@ -1,15 +1,15 @@
 <Project>
-  <PropertyGroup>
-    <LangVersion>latest</LangVersion>
-    <Nullable>enable</Nullable>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
-    <AnalysisLevel>latest-recommended</AnalysisLevel>
-    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+	<PropertyGroup>
+		<LangVersion>latest</LangVersion>
+		<Nullable>enable</Nullable>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+		<AnalysisLevel>latest-recommended</AnalysisLevel>
+		<EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
 
-    <!-- Package metadata defaults -->
-    <Authors>AntonZhelezniakou-WTG</Authors>
-    <RepositoryUrl>https://github.com/AntonZhelezniakou-WTG/git-run</RepositoryUrl>
-    <RepositoryType>git</RepositoryType>
-  </PropertyGroup>
+		<!-- Package metadata defaults -->
+		<Authors>AntonZhelezniakou-WTG</Authors>
+		<RepositoryUrl>https://github.com/AntonZhelezniakou-WTG/git-run</RepositoryUrl>
+		<RepositoryType>git</RepositoryType>
+	</PropertyGroup>
 </Project>

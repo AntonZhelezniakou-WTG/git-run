@@ -3,12 +3,12 @@ root = true
 [*]
 charset = utf-8
 end_of_line = lf
-indent_style = space
+indent_style = tab
 insert_final_newline = true
 trim_trailing_whitespace = true
 
 [*.{cs,csx}]
-indent_size = 4
+tab_width = 4
 
 # C# - latest language features
 csharp_style_prefer_primary_constructors = true:suggestion
@@ -71,10 +71,10 @@ dotnet_sort_system_directives_first = true
 dotnet_separate_import_directive_groups = false
 
 [*.{xml,csproj,props,targets,config}]
-indent_size = 2
+tab_width = 2
 
 [*.{json,yaml,yml}]
-indent_size = 2
+tab_width = 2
 
 [*.md]
 trim_trailing_whitespace = false
