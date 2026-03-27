@@ -10,7 +10,7 @@ namespace GitRun;
 /// </summary>
 public sealed class GitRunner : IGitRunner
 {
-	private readonly GitRunnerOptions _options;
+	readonly GitRunnerOptions _options;
 
 	/// <summary>
 	/// Initializes a new instance of <see cref="GitRunner"/> with default options.
@@ -65,7 +65,9 @@ public sealed class GitRunner : IGitRunner
 			AllowSynchronousContinuations = false,
 		});
 
-		using var process = new Process { StartInfo = startInfo, EnableRaisingEvents = true };
+		using var process = new Process();
+		process.StartInfo = startInfo;
+		process.EnableRaisingEvents = true;
 
 		process.Start();
 
@@ -124,7 +126,7 @@ public sealed class GitRunner : IGitRunner
 		return null;
 	}
 
-	private static async Task ReadPipeIntoChannelAsync(
+	static async Task ReadPipeIntoChannelAsync(
 		TextReader reader,
 		ChannelWriter<string> writer,
 		CancellationToken cancellationToken)
@@ -141,7 +143,7 @@ public sealed class GitRunner : IGitRunner
 		}
 	}
 
-	private static async Task ReadPipeIntoBufferAsync(
+	static async Task ReadPipeIntoBufferAsync(
 		TextReader reader,
 		StringBuilder buffer,
 		CancellationToken cancellationToken)
@@ -163,7 +165,7 @@ public sealed class GitRunner : IGitRunner
 		}
 	}
 
-	private static async Task FinishWriterAsync(
+	static async Task FinishWriterAsync(
 		Task stdoutTask,
 		ChannelWriter<string> writer)
 	{
