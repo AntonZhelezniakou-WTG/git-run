@@ -93,6 +93,33 @@ public sealed class GitRunner : IGitRunner
 		}
 	}
 
+	/// <inheritdoc/>
+	public Task<string?> ReadFirstLineAsync(
+		string arguments,
+		Func<string, bool>? predicate = null,
+		CancellationToken cancellationToken = default) =>
+		ReadFirstLineAsync(arguments, workingDirectory: null, predicate, cancellationToken);
+
+	/// <inheritdoc/>
+	public async Task<string?> ReadFirstLineAsync(
+		string arguments,
+		string? workingDirectory,
+		Func<string, bool>? predicate = null,
+		CancellationToken cancellationToken = default)
+	{
+		predicate ??= _ => true;
+
+		await foreach (var line in RunAsync(arguments, workingDirectory, cancellationToken))
+		{
+			if (predicate(line))
+			{
+				return line;
+			}
+		}
+
+		return null;
+	}
+
 	private static async Task ReadPipeIntoChannelAsync(
 		TextReader reader,
 		ChannelWriter<string> writer,

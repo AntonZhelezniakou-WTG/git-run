@@ -198,5 +198,99 @@ public sealed class GitRunnerTests
 			await foreach (var _ in runner.RunAsync(args!)) { }
 		});
 	}
+
+	[Test]
+	public async Task ReadFirstLineAsync_ReturnsFirstLine()
+	{
+		var repoDir = CreateTempGitRepo();
+		try
+		{
+			var runner = new GitRunner(new GitRunnerOptions
+			{
+				WorkingDirectory = repoDir,
+				IncludeStandardError = false,
+			});
+
+			var line = await runner.ReadFirstLineAsync("log --oneline");
+
+			Assert.That(line, Is.Not.Null);
+			Assert.That(line, Is.Not.Empty);
+		}
+		finally
+		{
+			Directory.Delete(repoDir, recursive: true);
+		}
+	}
+
+	[Test]
+	public async Task ReadFirstLineAsync_WithPredicate_ReturnsMatchingLine()
+	{
+		var repoDir = CreateTempGitRepo();
+		try
+		{
+			var runner = new GitRunner(new GitRunnerOptions
+			{
+				WorkingDirectory = repoDir,
+				IncludeStandardError = false,
+			});
+
+			var line = await runner.ReadFirstLineAsync(
+				"log --oneline",
+				predicate: l => l.Contains("init"));
+
+			Assert.That(line, Is.Not.Null);
+			Assert.That(line, Does.Contain("init"));
+		}
+		finally
+		{
+			Directory.Delete(repoDir, recursive: true);
+		}
+	}
+
+	[Test]
+	public async Task ReadFirstLineAsync_NoMatch_ReturnsNull()
+	{
+		var repoDir = CreateTempGitRepo();
+		try
+		{
+			var runner = new GitRunner(new GitRunnerOptions
+			{
+				WorkingDirectory = repoDir,
+				IncludeStandardError = false,
+			});
+
+			var line = await runner.ReadFirstLineAsync(
+				"log --oneline",
+				predicate: _ => false);
+
+			Assert.That(line, Is.Null);
+		}
+		finally
+		{
+			Directory.Delete(repoDir, recursive: true);
+		}
+	}
+
+	[Test]
+	public async Task ReadFirstLineAsync_WithWorkingDirectory_UsesOverride()
+	{
+		var repoDir = CreateTempGitRepo();
+		try
+		{
+			var runner = new GitRunner(new GitRunnerOptions
+			{
+				IncludeStandardError = false,
+			});
+
+			var line = await runner.ReadFirstLineAsync("log --oneline", repoDir);
+
+			Assert.That(line, Is.Not.Null);
+			Assert.That(line, Is.Not.Empty);
+		}
+		finally
+		{
+			Directory.Delete(repoDir, recursive: true);
+		}
+	}
 }
 
