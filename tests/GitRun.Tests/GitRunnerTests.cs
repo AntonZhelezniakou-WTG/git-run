@@ -1,16 +1,10 @@
-using System.Collections.Generic;
-using System.IO;
-using System.Threading;
-using System.Threading.Tasks;
-using GitRun;
-
 namespace GitRun.Tests;
 
 [TestFixture]
 public sealed class GitRunnerTests
 {
 	// Locate a temporary directory that is a valid git repository so we can run real commands.
-	private static string CreateTempGitRepo()
+	static string CreateTempGitRepo()
 	{
 		var dir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
 		Directory.CreateDirectory(dir);
@@ -21,7 +15,7 @@ public sealed class GitRunnerTests
 		return dir;
 	}
 
-	private static void RunGit(string args, string workingDir)
+	static void RunGit(string args, string workingDir)
 	{
 		var psi = new System.Diagnostics.ProcessStartInfo("git", args)
 		{
@@ -88,52 +82,70 @@ public sealed class GitRunnerTests
 	}
 
 	[Test]
-	public async Task RunAsync_NonZeroExitCode_ThrowsGitRunException()
+	public Task RunAsync_NonZeroExitCode_ThrowsGitRunException()
 	{
-		var repoDir = CreateTempGitRepo();
 		try
 		{
-			var runner = new GitRunner(new GitRunnerOptions
+			var repoDir = CreateTempGitRepo();
+			try
 			{
-				WorkingDirectory = repoDir,
-				ThrowOnNonZeroExitCode = true,
-			});
+				var runner = new GitRunner(new GitRunnerOptions
+				{
+					WorkingDirectory = repoDir,
+					ThrowOnNonZeroExitCode = true,
+				});
 
-			// "git this-command-does-not-exist" exits with code 1.
-			Assert.ThrowsAsync<GitRunException>(async () =>
+				// "git this-command-does-not-exist" exits with code 1.
+				Assert.ThrowsAsync<GitRunException>(async () =>
+				{
+					await foreach (var _ in runner.RunAsync("this-command-does-not-exist")) { }
+				});
+			}
+			finally
 			{
-				await foreach (var _ in runner.RunAsync("this-command-does-not-exist")) { }
-			});
+				Directory.Delete(repoDir, recursive: true);
+			}
+
+			return Task.CompletedTask;
 		}
-		finally
+		catch (Exception exception)
 		{
-			Directory.Delete(repoDir, recursive: true);
+			return Task.FromException(exception);
 		}
 	}
 
 	[Test]
-	public async Task RunAsync_NonZeroExitCode_ExceptionContainsStandardError()
+	public Task RunAsync_NonZeroExitCode_ExceptionContainsStandardError()
 	{
-		var repoDir = CreateTempGitRepo();
 		try
 		{
-			var runner = new GitRunner(new GitRunnerOptions
+			var repoDir = CreateTempGitRepo();
+			try
 			{
-				WorkingDirectory = repoDir,
-				ThrowOnNonZeroExitCode = true,
-			});
+				var runner = new GitRunner(new GitRunnerOptions
+				{
+					WorkingDirectory = repoDir,
+					ThrowOnNonZeroExitCode = true,
+				});
 
-			var ex = Assert.ThrowsAsync<GitRunException>(async () =>
+				var ex = Assert.ThrowsAsync<GitRunException>(async () =>
+				{
+					await foreach (var _ in runner.RunAsync("this-command-does-not-exist")) { }
+				});
+
+				Assert.That(ex, Is.Not.Null);
+				Assert.That(ex!.StandardError, Is.Not.Empty);
+			}
+			finally
 			{
-				await foreach (var _ in runner.RunAsync("this-command-does-not-exist")) { }
-			});
+				Directory.Delete(repoDir, recursive: true);
+			}
 
-			Assert.That(ex, Is.Not.Null);
-			Assert.That(ex!.StandardError, Is.Not.Empty);
+			return Task.CompletedTask;
 		}
-		finally
+		catch (Exception exception)
 		{
-			Directory.Delete(repoDir, recursive: true);
+			return Task.FromException(exception);
 		}
 	}
 
