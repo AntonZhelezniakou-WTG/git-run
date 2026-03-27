@@ -44,7 +44,6 @@ public sealed class GitRunnerTests
 			var runner = new GitRunner(new GitRunnerOptions
 			{
 				WorkingDirectory = repoDir,
-				IncludeStandardError = false,
 				ThrowOnNonZeroExitCode = true,
 			});
 
@@ -71,7 +70,6 @@ public sealed class GitRunnerTests
 			// The runner has NO working directory set; we pass it explicitly.
 			var runner = new GitRunner(new GitRunnerOptions
 			{
-				IncludeStandardError = false,
 				ThrowOnNonZeroExitCode = true,
 			});
 
@@ -106,6 +104,32 @@ public sealed class GitRunnerTests
 			{
 				await foreach (var _ in runner.RunAsync("this-command-does-not-exist")) { }
 			});
+		}
+		finally
+		{
+			Directory.Delete(repoDir, recursive: true);
+		}
+	}
+
+	[Test]
+	public async Task RunAsync_NonZeroExitCode_ExceptionContainsStandardError()
+	{
+		var repoDir = CreateTempGitRepo();
+		try
+		{
+			var runner = new GitRunner(new GitRunnerOptions
+			{
+				WorkingDirectory = repoDir,
+				ThrowOnNonZeroExitCode = true,
+			});
+
+			var ex = Assert.ThrowsAsync<GitRunException>(async () =>
+			{
+				await foreach (var _ in runner.RunAsync("this-command-does-not-exist")) { }
+			});
+
+			Assert.That(ex, Is.Not.Null);
+			Assert.That(ex!.StandardError, Is.Not.Empty);
 		}
 		finally
 		{
@@ -165,12 +189,21 @@ public sealed class GitRunnerTests
 	{
 		const string args = "gc --prune=now --aggressive";
 		const int exitCode = 128;
-		var ex = new GitRunException(args, exitCode);
+		const string stderr = "fatal: not a git repository";
+		var ex = new GitRunException(args, exitCode, stderr);
 
 		Assert.That(ex.Arguments, Is.EqualTo(args));
 		Assert.That(ex.ExitCode, Is.EqualTo(exitCode));
+		Assert.That(ex.StandardError, Is.EqualTo(stderr));
 		Assert.That(ex.Message, Does.Contain(args));
 		Assert.That(ex.Message, Does.Contain("128"));
+	}
+
+	[Test]
+	public void GitRunException_DefaultStandardError_IsEmpty()
+	{
+		var ex = new GitRunException("status", 1);
+		Assert.That(ex.StandardError, Is.EqualTo(string.Empty));
 	}
 
 	[Test]
@@ -179,7 +212,6 @@ public sealed class GitRunnerTests
 		var opts = new GitRunnerOptions();
 
 		Assert.That(opts.GitExecutable, Is.EqualTo("git"));
-		Assert.That(opts.IncludeStandardError, Is.True);
 		Assert.That(opts.ThrowOnNonZeroExitCode, Is.True);
 		Assert.That(opts.WorkingDirectory, Is.Null);
 	}
@@ -208,7 +240,6 @@ public sealed class GitRunnerTests
 			var runner = new GitRunner(new GitRunnerOptions
 			{
 				WorkingDirectory = repoDir,
-				IncludeStandardError = false,
 			});
 
 			var line = await runner.ReadFirstLineAsync("log --oneline");
@@ -231,7 +262,6 @@ public sealed class GitRunnerTests
 			var runner = new GitRunner(new GitRunnerOptions
 			{
 				WorkingDirectory = repoDir,
-				IncludeStandardError = false,
 			});
 
 			var line = await runner.ReadFirstLineAsync(
@@ -256,7 +286,6 @@ public sealed class GitRunnerTests
 			var runner = new GitRunner(new GitRunnerOptions
 			{
 				WorkingDirectory = repoDir,
-				IncludeStandardError = false,
 			});
 
 			var line = await runner.ReadFirstLineAsync(
@@ -277,10 +306,7 @@ public sealed class GitRunnerTests
 		var repoDir = CreateTempGitRepo();
 		try
 		{
-			var runner = new GitRunner(new GitRunnerOptions
-			{
-				IncludeStandardError = false,
-			});
+			var runner = new GitRunner();
 
 			var line = await runner.ReadFirstLineAsync("log --oneline", repoDir);
 

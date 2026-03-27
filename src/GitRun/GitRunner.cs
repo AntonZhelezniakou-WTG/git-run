@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
+using System.Text;
 using System.Threading.Channels;
 
 namespace GitRun;
@@ -51,15 +52,15 @@ public sealed class GitRunner : IGitRunner
 			Arguments = arguments,
 			WorkingDirectory = effectiveWorkingDirectory,
 			RedirectStandardOutput = true,
-			RedirectStandardError = _options.IncludeStandardError,
+			RedirectStandardError = true,
 			UseShellExecute = false,
 			CreateNoWindow = true,
 		};
 
-		// Use an unbounded channel to decouple the process reader threads from the consumer.
+		// Use an unbounded channel to decouple the stdout reader thread from the consumer.
 		var channel = Channel.CreateUnbounded<string>(new UnboundedChannelOptions
 		{
-			SingleWriter = false,
+			SingleWriter = true,
 			SingleReader = true,
 			AllowSynchronousContinuations = false,
 		});
@@ -68,16 +69,17 @@ public sealed class GitRunner : IGitRunner
 
 		process.Start();
 
-		// Start reading stdout and stderr concurrently so neither pipe blocks the other.
+		// Read stdout into the channel for the consumer.
 		var stdoutTask = ReadPipeIntoChannelAsync(
 			process.StandardOutput, channel.Writer, cancellationToken);
 
-		var stderrTask = _options.IncludeStandardError
-			? ReadPipeIntoChannelAsync(process.StandardError, channel.Writer, cancellationToken)
-			: Task.CompletedTask;
+		// Capture stderr separately into a buffer.
+		var stderrBuffer = new StringBuilder();
+		var stderrTask = ReadPipeIntoBufferAsync(
+			process.StandardError, stderrBuffer, cancellationToken);
 
-		// Complete the channel writer once both pipe readers are done.
-		_ = FinishWriterAsync(stdoutTask, stderrTask, channel.Writer);
+		// Complete the channel writer once stdout is done.
+		_ = FinishWriterAsync(stdoutTask, channel.Writer);
 
 		// Yield lines as they arrive.
 		await foreach (var line in channel.Reader.ReadAllAsync(cancellationToken))
@@ -85,11 +87,13 @@ public sealed class GitRunner : IGitRunner
 			yield return line;
 		}
 
+		// Ensure stderr is fully captured before checking exit code.
+		await stderrTask.ConfigureAwait(false);
 		await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
 
 		if (_options.ThrowOnNonZeroExitCode && process.ExitCode != 0)
 		{
-			throw new GitRunException(arguments, process.ExitCode);
+			throw new GitRunException(arguments, process.ExitCode, stderrBuffer.ToString());
 		}
 	}
 
@@ -137,14 +141,35 @@ public sealed class GitRunner : IGitRunner
 		}
 	}
 
+	private static async Task ReadPipeIntoBufferAsync(
+		TextReader reader,
+		StringBuilder buffer,
+		CancellationToken cancellationToken)
+	{
+		while (!cancellationToken.IsCancellationRequested)
+		{
+			var line = await reader.ReadLineAsync(cancellationToken).ConfigureAwait(false);
+			if (line is null)
+			{
+				break;
+			}
+
+			if (buffer.Length > 0)
+			{
+				buffer.AppendLine();
+			}
+
+			buffer.Append(line);
+		}
+	}
+
 	private static async Task FinishWriterAsync(
 		Task stdoutTask,
-		Task stderrTask,
 		ChannelWriter<string> writer)
 	{
 		try
 		{
-			await Task.WhenAll(stdoutTask, stderrTask).ConfigureAwait(false);
+			await stdoutTask.ConfigureAwait(false);
 			writer.Complete();
 		}
 		catch (Exception ex)

@@ -18,12 +18,6 @@ public sealed class GitRunnerOptions
 	public string GitExecutable { get; set; } = "git";
 
 	/// <summary>
-	/// Gets or sets a value indicating whether stderr output is included in the returned sequence.
-	/// Defaults to <see langword="true"/>.
-	/// </summary>
-	public bool IncludeStandardError { get; set; } = true;
-
-	/// <summary>
 	/// Gets or sets a value indicating whether the runner throws a <see cref="GitRunException"/>
 	/// when the git process exits with a non-zero exit code.
 	/// Defaults to <see langword="true"/>.

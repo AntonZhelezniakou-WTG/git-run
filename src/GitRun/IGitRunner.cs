@@ -8,7 +8,9 @@ namespace GitRun;
 public interface IGitRunner
 {
 	/// <summary>
-	/// Executes a git command and streams the combined stdout/stderr output line by line.
+	/// Executes a git command and streams the standard output line by line.
+	/// Standard error is captured separately and included in <see cref="GitRunException"/>
+	/// when the process exits with a non-zero exit code.
 	/// </summary>
 	/// <param name="arguments">
 	/// The git arguments as a plaintext string, e.g. <c>"gc --prune=now --aggressive"</c>.
@@ -23,7 +25,10 @@ public interface IGitRunner
 		CancellationToken cancellationToken = default);
 
 	/// <summary>
-	/// Executes a git command inside the specified working directory and streams output line by line.
+	/// Executes a git command inside the specified working directory and streams
+	/// the standard output line by line.
+	/// Standard error is captured separately and included in <see cref="GitRunException"/>
+	/// when the process exits with a non-zero exit code.
 	/// </summary>
 	/// <param name="arguments">
 	/// The git arguments as a plaintext string, e.g. <c>"status --short"</c>.
