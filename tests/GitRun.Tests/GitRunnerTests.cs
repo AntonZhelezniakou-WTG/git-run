@@ -1,12 +1,12 @@
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using GitRun;
 
 namespace GitRun.Tests;
 
+[TestFixture]
 public sealed class GitRunnerTests
 {
     // Locate a temporary directory that is a valid git repository so we can run real commands.
@@ -15,6 +15,8 @@ public sealed class GitRunnerTests
         var dir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
         Directory.CreateDirectory(dir);
         RunGit("init", dir);
+        RunGit("config user.email \"test@example.com\"", dir);
+        RunGit("config user.name \"Test\"", dir);
         RunGit("commit --allow-empty -m init", dir);
         return dir;
     }
@@ -33,7 +35,7 @@ public sealed class GitRunnerTests
         p.WaitForExit();
     }
 
-    [Fact]
+    [Test]
     public async Task RunAsync_ValidCommand_ReturnsLines()
     {
         var repoDir = CreateTempGitRepo();
@@ -52,7 +54,7 @@ public sealed class GitRunnerTests
                 lines.Add(line);
             }
 
-            Assert.NotEmpty(lines);
+            Assert.That(lines, Is.Not.Empty);
         }
         finally
         {
@@ -60,7 +62,7 @@ public sealed class GitRunnerTests
         }
     }
 
-    [Fact]
+    [Test]
     public async Task RunAsync_WithWorkingDirectoryOverride_UsesOverride()
     {
         var repoDir = CreateTempGitRepo();
@@ -79,7 +81,7 @@ public sealed class GitRunnerTests
                 lines.Add(line);
             }
 
-            Assert.NotEmpty(lines);
+            Assert.That(lines, Is.Not.Empty);
         }
         finally
         {
@@ -87,7 +89,7 @@ public sealed class GitRunnerTests
         }
     }
 
-    [Fact]
+    [Test]
     public async Task RunAsync_NonZeroExitCode_ThrowsGitRunException()
     {
         var repoDir = CreateTempGitRepo();
@@ -99,9 +101,9 @@ public sealed class GitRunnerTests
                 ThrowOnNonZeroExitCode = true,
             });
 
-            await Assert.ThrowsAsync<GitRunException>(async () =>
+            // "git this-command-does-not-exist" exits with code 1.
+            Assert.ThrowsAsync<GitRunException>(async () =>
             {
-                // "git this-command-does-not-exist" exits with code 1.
                 await foreach (var _ in runner.RunAsync("this-command-does-not-exist")) { }
             });
         }
@@ -111,7 +113,7 @@ public sealed class GitRunnerTests
         }
     }
 
-    [Fact]
+    [Test]
     public async Task RunAsync_NonZeroExitCode_DoesNotThrowWhenDisabled()
     {
         var repoDir = CreateTempGitRepo();
@@ -132,8 +134,8 @@ public sealed class GitRunnerTests
         }
     }
 
-    [Fact]
-    public async Task RunAsync_CancellationRequested_StopsEnumeration()
+    [Test]
+    public void RunAsync_CancellationRequested_StopsEnumeration()
     {
         var repoDir = CreateTempGitRepo();
         try
@@ -147,7 +149,7 @@ public sealed class GitRunnerTests
             using var cts = new CancellationTokenSource();
             cts.Cancel();
 
-            await Assert.ThrowsAnyAsync<OperationCanceledException>(async () =>
+            Assert.CatchAsync<OperationCanceledException>(async () =>
             {
                 await foreach (var _ in runner.RunAsync("log --oneline", cts.Token)) { }
             });
@@ -158,43 +160,43 @@ public sealed class GitRunnerTests
         }
     }
 
-    [Fact]
+    [Test]
     public void GitRunException_ContainsCorrectProperties()
     {
         const string args = "gc --prune=now --aggressive";
         const int exitCode = 128;
         var ex = new GitRunException(args, exitCode);
 
-        Assert.Equal(args, ex.Arguments);
-        Assert.Equal(exitCode, ex.ExitCode);
-        Assert.Contains(args, ex.Message);
-        Assert.Contains("128", ex.Message);
+        Assert.That(ex.Arguments, Is.EqualTo(args));
+        Assert.That(ex.ExitCode, Is.EqualTo(exitCode));
+        Assert.That(ex.Message, Does.Contain(args));
+        Assert.That(ex.Message, Does.Contain("128"));
     }
 
-    [Fact]
+    [Test]
     public void GitRunnerOptions_Defaults_AreCorrect()
     {
         var opts = new GitRunnerOptions();
 
-        Assert.Equal("git", opts.GitExecutable);
-        Assert.True(opts.IncludeStandardError);
-        Assert.True(opts.ThrowOnNonZeroExitCode);
-        Assert.Null(opts.WorkingDirectory);
+        Assert.That(opts.GitExecutable, Is.EqualTo("git"));
+        Assert.That(opts.IncludeStandardError, Is.True);
+        Assert.That(opts.ThrowOnNonZeroExitCode, Is.True);
+        Assert.That(opts.WorkingDirectory, Is.Null);
     }
 
-    [Theory]
-    [InlineData(null)]
-    [InlineData("")]
-    [InlineData("   ")]
-    public async Task RunAsync_NullOrWhitespaceArguments_Throws(string? args)
+    [TestCase(null)]
+    [TestCase("")]
+    [TestCase("   ")]
+    public void RunAsync_NullOrWhitespaceArguments_Throws(string? args)
     {
         var runner = new GitRunner();
 
         // null produces ArgumentNullException (a subtype of ArgumentException);
-        // empty/whitespace produces ArgumentException — ThrowsAnyAsync accepts subtypes.
-        await Assert.ThrowsAnyAsync<ArgumentException>(async () =>
+        // empty/whitespace produces ArgumentException — CatchAsync accepts subtypes.
+        Assert.CatchAsync<ArgumentException>(async () =>
         {
             await foreach (var _ in runner.RunAsync(args!)) { }
         });
     }
 }
+
