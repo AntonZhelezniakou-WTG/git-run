@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/GitRun/GitRun.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/GitRun.Tests/GitRun.Tests.csproj" />
+  </Folder>
+</Solution>
