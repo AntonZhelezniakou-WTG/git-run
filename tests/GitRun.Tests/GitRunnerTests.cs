@@ -3,32 +3,6 @@ namespace GitRun.Tests;
 [TestFixture]
 public sealed class GitRunnerTests
 {
-	// Locate a temporary directory that is a valid git repository so we can run real commands.
-	static string CreateTempGitRepo()
-	{
-		var dir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
-		Directory.CreateDirectory(dir);
-		RunGit("init", dir);
-		RunGit("config user.email \"test@example.com\"", dir);
-		RunGit("config user.name \"Test\"", dir);
-		RunGit("commit --allow-empty -m init", dir);
-		return dir;
-	}
-
-	static void RunGit(string args, string workingDir)
-	{
-		var psi = new System.Diagnostics.ProcessStartInfo("git", args)
-		{
-			WorkingDirectory = workingDir,
-			RedirectStandardOutput = true,
-			RedirectStandardError = true,
-			UseShellExecute = false,
-			CreateNoWindow = true,
-		};
-		using var p = System.Diagnostics.Process.Start(psi)!;
-		p.WaitForExit();
-	}
-
 	[Test]
 	public async Task RunAsync_ValidCommand_ReturnsLines()
 	{
@@ -51,7 +25,7 @@ public sealed class GitRunnerTests
 		}
 		finally
 		{
-			Directory.Delete(repoDir, recursive: true);
+			DeleteTempRepo(repoDir);
 		}
 	}
 
@@ -61,8 +35,7 @@ public sealed class GitRunnerTests
 		var repoDir = CreateTempGitRepo();
 		try
 		{
-			// The runner has NO working directory set; we pass it explicitly.
-			var runner = new GitRunner(new GitRunnerOptions
+				var runner = new GitRunner(new GitRunnerOptions
 			{
 				ThrowOnNonZeroExitCode = true,
 			});
@@ -77,7 +50,7 @@ public sealed class GitRunnerTests
 		}
 		finally
 		{
-			Directory.Delete(repoDir, recursive: true);
+			DeleteTempRepo(repoDir);
 		}
 	}
 
@@ -95,15 +68,14 @@ public sealed class GitRunnerTests
 					ThrowOnNonZeroExitCode = true,
 				});
 
-				// "git this-command-does-not-exist" exits with code 1.
-				Assert.ThrowsAsync<GitRunException>(async () =>
+					Assert.ThrowsAsync<GitRunException>(async () =>
 				{
 					await foreach (var _ in runner.RunAsync("this-command-does-not-exist")) { }
 				});
 			}
 			finally
 			{
-				Directory.Delete(repoDir, recursive: true);
+				DeleteTempRepo(repoDir);
 			}
 
 			return Task.CompletedTask;
@@ -138,7 +110,7 @@ public sealed class GitRunnerTests
 			}
 			finally
 			{
-				Directory.Delete(repoDir, recursive: true);
+				DeleteTempRepo(repoDir);
 			}
 
 			return Task.CompletedTask;
@@ -161,12 +133,11 @@ public sealed class GitRunnerTests
 				ThrowOnNonZeroExitCode = false,
 			});
 
-			// Should not throw even though the command fails.
-			await foreach (var _ in runner.RunAsync("this-command-does-not-exist")) { }
+				await foreach (var _ in runner.RunAsync("this-command-does-not-exist")) { }
 		}
 		finally
 		{
-			Directory.Delete(repoDir, recursive: true);
+			DeleteTempRepo(repoDir);
 		}
 	}
 
@@ -192,7 +163,7 @@ public sealed class GitRunnerTests
 		}
 		finally
 		{
-			Directory.Delete(repoDir, recursive: true);
+			DeleteTempRepo(repoDir);
 		}
 	}
 
@@ -202,6 +173,7 @@ public sealed class GitRunnerTests
 		const string args = "gc --prune=now --aggressive";
 		const int exitCode = 128;
 		const string stderr = "fatal: not a git repository";
+
 		var ex = new GitRunException(args, exitCode, stderr);
 
 		Assert.That(ex.Arguments, Is.EqualTo(args));
@@ -216,6 +188,234 @@ public sealed class GitRunnerTests
 	{
 		var ex = new GitRunException("status", 1);
 		Assert.That(ex.StandardError, Is.EqualTo(string.Empty));
+	}
+
+	[Test]
+	public void Run_ValidCommand_ReturnsOutput()
+	{
+		var repoDir = CreateTempGitRepo();
+		try
+		{
+			var runner = new GitRunner(new GitRunnerOptions
+			{
+				WorkingDirectory = repoDir,
+				ThrowOnNonZeroExitCode = true,
+			});
+
+			var output = runner.Run("log --oneline");
+
+			Assert.That(output, Is.Not.Null);
+			Assert.That(output, Is.Not.Empty);
+		}
+		finally
+		{
+			DeleteTempRepo(repoDir);
+		}
+	}
+
+	[Test]
+	public void Run_WithWorkingDirectoryOverride_UsesOverride()
+	{
+		var repoDir = CreateTempGitRepo();
+		try
+		{
+			var runner = new GitRunner(new GitRunnerOptions
+			{
+				ThrowOnNonZeroExitCode = true,
+			});
+
+			var output = runner.Run("log --oneline", repoDir);
+
+			Assert.That(output, Is.Not.Null);
+			Assert.That(output, Is.Not.Empty);
+		}
+		finally
+		{
+			DeleteTempRepo(repoDir);
+		}
+	}
+
+	[Test]
+	public void Run_NonZeroExitCode_ThrowsGitRunException()
+	{
+		var repoDir = CreateTempGitRepo();
+		try
+		{
+			var runner = new GitRunner(new GitRunnerOptions
+			{
+				WorkingDirectory = repoDir,
+				ThrowOnNonZeroExitCode = true,
+			});
+
+			Assert.Throws<GitRunException>(() => runner.Run("this-command-does-not-exist"));
+		}
+		finally
+		{
+			DeleteTempRepo(repoDir);
+		}
+	}
+
+	[Test]
+	public void Run_NonZeroExitCode_ExceptionContainsStandardError()
+	{
+		var repoDir = CreateTempGitRepo();
+		try
+		{
+			var runner = new GitRunner(new GitRunnerOptions
+			{
+				WorkingDirectory = repoDir,
+				ThrowOnNonZeroExitCode = true,
+			});
+
+			var ex = Assert.Throws<GitRunException>(() => runner.Run("this-command-does-not-exist"));
+
+			Assert.That(ex, Is.Not.Null);
+			Assert.That(ex!.StandardError, Is.Not.Empty);
+		}
+		finally
+		{
+			DeleteTempRepo(repoDir);
+		}
+	}
+
+	[Test]
+	public void Run_NonZeroExitCode_DoesNotThrowWhenDisabled()
+	{
+		var repoDir = CreateTempGitRepo();
+		try
+		{
+			var runner = new GitRunner(new GitRunnerOptions
+			{
+				WorkingDirectory = repoDir,
+				ThrowOnNonZeroExitCode = false,
+			});
+
+			Assert.DoesNotThrow(() => runner.Run("this-command-does-not-exist"));
+		}
+		finally
+		{
+			DeleteTempRepo(repoDir);
+		}
+	}
+
+	[TestCase(null)]
+	[TestCase("")]
+	[TestCase("   ")]
+	public void Run_NullOrWhitespaceArguments_Throws(string? args)
+	{
+		var runner = new GitRunner();
+
+		Assert.Catch<ArgumentException>(() => runner.Run(args!));
+	}
+
+	[Test]
+	public void ReadFirstLine_ReturnsFirstLine()
+	{
+		var repoDir = CreateTempGitRepo();
+		try
+		{
+			var runner = new GitRunner(new GitRunnerOptions
+			{
+				WorkingDirectory = repoDir,
+			});
+
+			var line = runner.ReadFirstLine("log --oneline");
+
+			Assert.That(line, Is.Not.Null);
+			Assert.That(line, Is.Not.Empty);
+		}
+		finally
+		{
+			DeleteTempRepo(repoDir);
+		}
+	}
+
+	[Test]
+	public void ReadFirstLine_WithPredicate_ReturnsMatchingLine()
+	{
+		var repoDir = CreateTempGitRepo();
+		try
+		{
+			var runner = new GitRunner(new GitRunnerOptions
+			{
+				WorkingDirectory = repoDir,
+			});
+
+			var line = runner.ReadFirstLine(
+				"log --oneline",
+				predicate: l => l.Contains("init"));
+
+			Assert.That(line, Is.Not.Null);
+			Assert.That(line, Does.Contain("init"));
+		}
+		finally
+		{
+			DeleteTempRepo(repoDir);
+		}
+	}
+
+	[Test]
+	public void ReadFirstLine_NoMatch_ReturnsNull()
+	{
+		var repoDir = CreateTempGitRepo();
+		try
+		{
+			var runner = new GitRunner(new GitRunnerOptions
+			{
+				WorkingDirectory = repoDir,
+			});
+
+			var line = runner.ReadFirstLine(
+				"log --oneline",
+				predicate: _ => false);
+
+			Assert.That(line, Is.Null);
+		}
+		finally
+		{
+			DeleteTempRepo(repoDir);
+		}
+	}
+
+	[Test]
+	public void ReadFirstLine_WithWorkingDirectory_UsesOverride()
+	{
+		var repoDir = CreateTempGitRepo();
+		try
+		{
+			var runner = new GitRunner();
+
+			var line = runner.ReadFirstLine("log --oneline", repoDir);
+
+			Assert.That(line, Is.Not.Null);
+			Assert.That(line, Is.Not.Empty);
+		}
+		finally
+		{
+			DeleteTempRepo(repoDir);
+		}
+	}
+
+	[Test]
+	public void ReadFirstLine_WithWorkingDirectoryAndPredicate_ReturnsMatchingLine()
+	{
+		var repoDir = CreateTempGitRepo();
+		try
+		{
+			var runner = new GitRunner();
+
+			var line = runner.ReadFirstLine(
+				"log --oneline",
+				repoDir,
+				predicate: l => l.Contains("init"));
+
+			Assert.That(line, Is.Not.Null);
+			Assert.That(line, Does.Contain("init"));
+		}
+		finally
+		{
+			DeleteTempRepo(repoDir);
+		}
 	}
 
 	[Test]
@@ -235,8 +435,6 @@ public sealed class GitRunnerTests
 	{
 		var runner = new GitRunner();
 
-		// null produces ArgumentNullException (a subtype of ArgumentException);
-		// empty/whitespace produces ArgumentException — CatchAsync accepts subtypes.
 		Assert.CatchAsync<ArgumentException>(async () =>
 		{
 			await foreach (var _ in runner.RunAsync(args!)) { }
@@ -261,7 +459,7 @@ public sealed class GitRunnerTests
 		}
 		finally
 		{
-			Directory.Delete(repoDir, recursive: true);
+			DeleteTempRepo(repoDir);
 		}
 	}
 
@@ -285,7 +483,7 @@ public sealed class GitRunnerTests
 		}
 		finally
 		{
-			Directory.Delete(repoDir, recursive: true);
+			DeleteTempRepo(repoDir);
 		}
 	}
 
@@ -308,7 +506,7 @@ public sealed class GitRunnerTests
 		}
 		finally
 		{
-			Directory.Delete(repoDir, recursive: true);
+			DeleteTempRepo(repoDir);
 		}
 	}
 
@@ -327,8 +525,41 @@ public sealed class GitRunnerTests
 		}
 		finally
 		{
-			Directory.Delete(repoDir, recursive: true);
+			DeleteTempRepo(repoDir);
 		}
 	}
-}
 
+		static void DeleteTempRepo(string path)
+	{
+		foreach (var file in Directory.EnumerateFiles(path, "*", SearchOption.AllDirectories))
+		{
+			File.SetAttributes(file, FileAttributes.Normal);
+		}
+		Directory.Delete(path, recursive: true);
+	}
+
+	static string CreateTempGitRepo()
+	{
+		var dir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+		Directory.CreateDirectory(dir);
+		RunGit("init", dir);
+		RunGit("config user.email \"test@example.com\"", dir);
+		RunGit("config user.name \"Test\"", dir);
+		RunGit("commit --allow-empty -m init", dir);
+		return dir;
+	}
+
+	static void RunGit(string args, string workingDir)
+	{
+		var psi = new System.Diagnostics.ProcessStartInfo("git", args)
+		{
+			WorkingDirectory = workingDir,
+			RedirectStandardOutput = true,
+			RedirectStandardError = true,
+			UseShellExecute = false,
+			CreateNoWindow = true,
+		};
+		using var p = System.Diagnostics.Process.Start(psi)!;
+		p.WaitForExit();
+	}
+}

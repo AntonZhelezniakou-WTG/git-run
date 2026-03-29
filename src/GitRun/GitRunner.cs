@@ -5,36 +5,25 @@ using System.Threading.Channels;
 
 namespace GitRun;
 
-/// <summary>
-/// Runs git commands as a child process and streams their output asynchronously.
-/// </summary>
 public sealed class GitRunner : IGitRunner
 {
 	readonly GitRunnerOptions _options;
 
-	/// <summary>
-	/// Initializes a new instance of <see cref="GitRunner"/> with default options.
-	/// </summary>
-	public GitRunner() : this(new GitRunnerOptions()) { }
+	public GitRunner() : this(new GitRunnerOptions())
+	{
+	}
 
-	/// <summary>
-	/// Initializes a new instance of <see cref="GitRunner"/> with the specified options.
-	/// </summary>
-	/// <param name="options">Options that control the runner behaviour.</param>
-	/// <exception cref="ArgumentNullException">Thrown when <paramref name="options"/> is null.</exception>
 	public GitRunner(GitRunnerOptions options)
 	{
 		ArgumentNullException.ThrowIfNull(options);
 		_options = options;
 	}
 
-	/// <inheritdoc/>
 	public IAsyncEnumerable<string> RunAsync(
 		string arguments,
 		CancellationToken cancellationToken = default) =>
 		RunAsync(arguments, workingDirectory: null, cancellationToken);
 
-	/// <inheritdoc/>
 	public async IAsyncEnumerable<string> RunAsync(
 		string arguments,
 		string? workingDirectory,
@@ -57,7 +46,6 @@ public sealed class GitRunner : IGitRunner
 			CreateNoWindow = true,
 		};
 
-		// Use an unbounded channel to decouple the stdout reader thread from the consumer.
 		var channel = Channel.CreateUnbounded<string>(new UnboundedChannelOptions
 		{
 			SingleWriter = true,
@@ -71,27 +59,33 @@ public sealed class GitRunner : IGitRunner
 
 		process.Start();
 
-		// Read stdout into the channel for the consumer.
 		var stdoutTask = ReadPipeIntoChannelAsync(
 			process.StandardOutput, channel.Writer, cancellationToken);
 
-		// Capture stderr separately into a buffer.
 		var stderrBuffer = new StringBuilder();
 		var stderrTask = ReadPipeIntoBufferAsync(
 			process.StandardError, stderrBuffer, cancellationToken);
 
-		// Complete the channel writer once stdout is done.
 		_ = FinishWriterAsync(stdoutTask, channel.Writer);
 
-		// Yield lines as they arrive.
-		await foreach (var line in channel.Reader.ReadAllAsync(cancellationToken))
+		try
 		{
-			yield return line;
-		}
+			await foreach (var line in channel.Reader.ReadAllAsync(cancellationToken))
+			{
+				yield return line;
+			}
 
-		// Ensure stderr is fully captured before checking exit code.
-		await stderrTask.ConfigureAwait(false);
-		await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
+			await stderrTask.ConfigureAwait(false);
+			await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
+		}
+		finally
+		{
+			if (!process.HasExited)
+			{
+				process.Kill(entireProcessTree: true);
+				await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
+			}
+		}
 
 		if (_options.ThrowOnNonZeroExitCode && process.ExitCode != 0)
 		{
@@ -99,14 +93,12 @@ public sealed class GitRunner : IGitRunner
 		}
 	}
 
-	/// <inheritdoc/>
 	public Task<string?> ReadFirstLineAsync(
 		string arguments,
 		Func<string, bool>? predicate = null,
 		CancellationToken cancellationToken = default) =>
 		ReadFirstLineAsync(arguments, workingDirectory: null, predicate, cancellationToken);
 
-	/// <inheritdoc/>
 	public async Task<string?> ReadFirstLineAsync(
 		string arguments,
 		string? workingDirectory,
@@ -163,6 +155,68 @@ public sealed class GitRunner : IGitRunner
 
 			buffer.Append(line);
 		}
+	}
+
+	public string Run(string arguments) =>
+		Run(arguments, workingDirectory: null);
+
+	public string Run(string arguments, string? workingDirectory)
+	{
+		ArgumentException.ThrowIfNullOrWhiteSpace(arguments);
+
+		var effectiveWorkingDirectory = workingDirectory
+			?? _options.WorkingDirectory
+			?? Directory.GetCurrentDirectory();
+
+		var startInfo = new ProcessStartInfo
+		{
+			FileName = _options.GitExecutable,
+			Arguments = arguments,
+			WorkingDirectory = effectiveWorkingDirectory,
+			RedirectStandardOutput = true,
+			RedirectStandardError = true,
+			UseShellExecute = false,
+			CreateNoWindow = true,
+		};
+
+		using var process = new Process();
+		process.StartInfo = startInfo;
+		process.Start();
+
+		var stdout = process.StandardOutput.ReadToEnd();
+		var stderr = process.StandardError.ReadToEnd();
+		process.WaitForExit();
+
+		if (_options.ThrowOnNonZeroExitCode && process.ExitCode != 0)
+		{
+			throw new GitRunException(arguments, process.ExitCode, stderr);
+		}
+
+		return stdout;
+	}
+
+	public string? ReadFirstLine(
+		string arguments,
+		Func<string, bool>? predicate = null) =>
+		ReadFirstLine(arguments, workingDirectory: null, predicate);
+
+	public string? ReadFirstLine(
+		string arguments,
+		string? workingDirectory,
+		Func<string, bool>? predicate = null)
+	{
+		predicate ??= _ => true;
+
+		using var reader = new StringReader(Run(arguments, workingDirectory));
+		while (reader.ReadLine() is { } line)
+		{
+			if (predicate(line))
+			{
+				return line;
+			}
+		}
+
+		return null;
 	}
 
 	static async Task FinishWriterAsync(
