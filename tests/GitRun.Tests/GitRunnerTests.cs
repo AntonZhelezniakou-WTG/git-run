@@ -122,7 +122,7 @@ public sealed class GitRunnerTests
 	}
 
 	[Test]
-	public async Task RunAsync_NonZeroExitCode_DoesNotThrowWhenDisabled()
+	public static async Task RunAsync_NonZeroExitCode_DoesNotThrowWhenDisabled()
 	{
 		var repoDir = CreateTempGitRepo();
 		try
@@ -133,7 +133,7 @@ public sealed class GitRunnerTests
 				ThrowOnNonZeroExitCode = false,
 			});
 
-				await foreach (var _ in runner.RunAsync("this-command-does-not-exist")) { }
+			await foreach (var _ in runner.RunAsync("this-command-does-not-exist")) { }
 		}
 		finally
 		{
@@ -547,11 +547,11 @@ public sealed class GitRunnerTests
 			{
 				await foreach (var _ in runner.RunAsync("log --stat", cts.Token))
 				{
-					cts.Cancel();
+					await cts.CancelAsync();
 				}
-			});
+			}, CancellationToken.None);
 
-			var completedInTime = await Task.WhenAny(task, Task.Delay(TimeSpan.FromSeconds(5))) == task;
+			var completedInTime = await Task.WhenAny(task, Task.Delay(TimeSpan.FromSeconds(5), CancellationToken.None)) == task;
 
 			Assert.That(completedInTime, Is.True, "RunAsync should terminate quickly after cancellation (ProcessGroup.TerminateAll was not effective)");
 		}
