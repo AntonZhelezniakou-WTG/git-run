@@ -18,6 +18,7 @@
 	</ItemGroup>
 
 	<ItemGroup>
+		<ProjectReference Include="..\..\ProcessGroup\src\ProcessGroup\ProcessGroup.csproj" />
 		<ProjectReference Include="..\..\src\GitRun\GitRun.csproj" />
 	</ItemGroup>
 

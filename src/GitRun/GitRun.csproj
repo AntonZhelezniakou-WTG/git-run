@@ -10,4 +10,8 @@
 		<PackageTags>git;async;IAsyncEnumerable</PackageTags>
 	</PropertyGroup>
 
+	<ItemGroup>
+	  <ProjectReference Include="..\..\ProcessGroup\src\ProcessGroup\ProcessGroup.csproj" />
+	</ItemGroup>
+
 </Project>

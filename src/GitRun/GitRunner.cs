@@ -53,11 +53,8 @@ public sealed class GitRunner : IGitRunner
 			AllowSynchronousContinuations = false,
 		});
 
-		using var process = new Process();
-		process.StartInfo = startInfo;
-		process.EnableRaisingEvents = true;
-
-		process.Start();
+		using var processGroup = new ProcessGroup.ProcessGroup();
+		using var process = processGroup.Start(startInfo);
 
 		var stdoutTask = ReadPipeIntoChannelAsync(
 			process.StandardOutput, channel.Writer, cancellationToken);
@@ -82,7 +79,7 @@ public sealed class GitRunner : IGitRunner
 		{
 			if (!process.HasExited)
 			{
-				process.Kill(entireProcessTree: true);
+				processGroup.TerminateAll();
 				await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
 			}
 		}
@@ -179,9 +176,8 @@ public sealed class GitRunner : IGitRunner
 			CreateNoWindow = true,
 		};
 
-		using var process = new Process();
-		process.StartInfo = startInfo;
-		process.Start();
+		using var processGroup = new ProcessGroup.ProcessGroup();
+		using var process = processGroup.Start(startInfo);
 
 		var stdout = process.StandardOutput.ReadToEnd();
 		var stderr = process.StandardError.ReadToEnd();

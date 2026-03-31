@@ -529,7 +529,126 @@ public sealed class GitRunnerTests
 		}
 	}
 
-		static void DeleteTempRepo(string path)
+		[Test]
+	public async Task RunAsync_ProcessGroup_CancelledMidOperation_TerminatesCleanly()
+	{
+		var repoDir = CreateTempGitRepoWithManyCommits(100);
+		try
+		{
+			var runner = new GitRunner(new GitRunnerOptions
+			{
+				WorkingDirectory = repoDir,
+				ThrowOnNonZeroExitCode = false,
+			});
+
+			using var cts = new CancellationTokenSource();
+
+			var task = Task.Run(async () =>
+			{
+				await foreach (var _ in runner.RunAsync("log --stat", cts.Token))
+				{
+					cts.Cancel();
+				}
+			});
+
+			var completedInTime = await Task.WhenAny(task, Task.Delay(TimeSpan.FromSeconds(5))) == task;
+
+			Assert.That(completedInTime, Is.True, "RunAsync should terminate quickly after cancellation (ProcessGroup.TerminateAll was not effective)");
+		}
+		finally
+		{
+			DeleteTempRepo(repoDir);
+		}
+	}
+
+	[Test]
+	public void Run_ProcessGroup_ConcurrentCalls_AllComplete()
+	{
+		var repoDirs = Enumerable.Range(0, 4).Select(_ => CreateTempGitRepo()).ToArray();
+		try
+		{
+			var tasks = repoDirs.Select(repoDir => Task.Run(() =>
+			{
+				var runner = new GitRunner(new GitRunnerOptions
+				{
+					WorkingDirectory = repoDir,
+					ThrowOnNonZeroExitCode = true,
+				});
+				return runner.Run("log --oneline");
+			})).ToArray();
+
+			Assert.DoesNotThrowAsync(async () => await Task.WhenAll(tasks));
+
+			foreach (var task in tasks)
+			{
+				Assert.That(task.Result, Is.Not.Empty);
+			}
+		}
+		finally
+		{
+			foreach (var repoDir in repoDirs)
+				DeleteTempRepo(repoDir);
+		}
+	}
+
+	[Test]
+	public async Task RunAsync_ProcessGroup_ConcurrentCalls_AllComplete()
+	{
+		var repoDirs = Enumerable.Range(0, 4).Select(_ => CreateTempGitRepo()).ToArray();
+		try
+		{
+			var tasks = repoDirs.Select(async repoDir =>
+			{
+				var runner = new GitRunner(new GitRunnerOptions
+				{
+					WorkingDirectory = repoDir,
+					ThrowOnNonZeroExitCode = true,
+				});
+				var lines = new List<string>();
+				await foreach (var line in runner.RunAsync("log --oneline"))
+					lines.Add(line);
+				return lines;
+			}).ToArray();
+
+			await Task.WhenAll(tasks);
+
+			foreach (var task in tasks)
+			{
+				Assert.That(task.Result, Is.Not.Empty);
+			}
+		}
+		finally
+		{
+			foreach (var repoDir in repoDirs)
+				DeleteTempRepo(repoDir);
+		}
+	}
+
+	[Test]
+	public void Run_ProcessGroup_SequentialCallsAfterCompletion_AllSucceed()
+	{
+		var repoDir = CreateTempGitRepo();
+		try
+		{
+			var runner = new GitRunner(new GitRunnerOptions
+			{
+				WorkingDirectory = repoDir,
+				ThrowOnNonZeroExitCode = true,
+			});
+
+			for (var i = 0; i < 3; i++)
+			{
+				var output = runner.Run("log --oneline");
+				Assert.That(output, Is.Not.Empty);
+			}
+		}
+		finally
+		{
+			DeleteTempRepo(repoDir);
+		}
+	}
+
+	static void DeleteTempRepo(string path)
 	{
 		foreach (var file in Directory.EnumerateFiles(path, "*", SearchOption.AllDirectories))
 		{
@@ -546,6 +665,14 @@ public sealed class GitRunnerTests
 		RunGit("config user.email \"test@example.com\"", dir);
 		RunGit("config user.name \"Test\"", dir);
 		RunGit("commit --allow-empty -m init", dir);
+		return dir;
+	}
+
+	static string CreateTempGitRepoWithManyCommits(int count)
+	{
+		var dir = CreateTempGitRepo();
+		for (var i = 0; i < count; i++)
+			RunGit($"commit --allow-empty -m commit{i}", dir);
 		return dir;
 	}
 
