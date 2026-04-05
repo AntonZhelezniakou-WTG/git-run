@@ -1,0 +1,7 @@
+<Solution>
+	<Folder Name="/ProcessGroup/">
+		<Project Path="ProcessGroup/src/ProcessGroup/ProcessGroup.csproj" />
+	</Folder>
+	<Project Path="src/GitRun/GitRun.csproj" />
+	<Project Path="tests/GitRun.Tests/GitRun.Tests.csproj" />
+</Solution>

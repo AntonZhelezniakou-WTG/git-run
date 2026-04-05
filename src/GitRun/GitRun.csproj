@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<TargetFramework>net10.0</TargetFramework>
+		<AssemblyName>GitRun</AssemblyName>
+
+		<PackageId>GitRun</PackageId>
+		<Version>1.0.0</Version>
+		<Description>Small .NET library for running git commands and streaming their output asynchronously.</Description>
+		<PackageTags>git;async;IAsyncEnumerable</PackageTags>
+	</PropertyGroup>
+
+	<ItemGroup>
+	  <ProjectReference Include="..\..\ProcessGroup\src\ProcessGroup\ProcessGroup.csproj" />
+	</ItemGroup>
+
+</Project>
