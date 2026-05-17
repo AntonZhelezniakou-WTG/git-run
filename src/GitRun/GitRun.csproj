@@ -34,4 +34,8 @@
 		<None Include="$(RepoRoot)CHANGELOG.md" Pack="true" PackagePath="\" />
 	</ItemGroup>
 
+	<ItemGroup>
+		<PackageReference Include="ProcessGroup" />
+	</ItemGroup>
+
 </Project>

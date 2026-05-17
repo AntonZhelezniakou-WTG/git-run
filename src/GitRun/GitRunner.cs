@@ -53,7 +53,7 @@ public sealed class GitRunner : IGitRunner
 			AllowSynchronousContinuations = false,
 		});
 
-		using var processGroup = new ProcessGroups.ProcessGroup();
+		await using var processGroup = new ProcessGroups.ProcessGroup();
 		using var process = processGroup.Start(startInfo, cancellationToken);
 
 		var stdoutTask = ReadPipeIntoChannelAsync(
