@@ -4,10 +4,10 @@
 		<TargetFramework>net10.0</TargetFramework>
 		<IsPackable>false</IsPackable>
 		<NoWarn>$(NoWarn);CA1707</NoWarn>
+		<AssemblySearchPaths>$(AssemblySearchPaths);..\..\src\GitRun\bin\$(Configuration)\$(TargetFramework)</AssemblySearchPaths>
 	</PropertyGroup>
 
 	<ItemGroup>
-		<PackageReference Include="coverlet.collector" />
 		<PackageReference Include="Microsoft.NET.Test.Sdk" />
 		<PackageReference Include="NUnit" />
 		<PackageReference Include="NUnit3TestAdapter" />
@@ -18,8 +18,11 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<ProjectReference Include="..\..\ProcessGroup\src\ProcessGroup\ProcessGroup.csproj" />
-		<ProjectReference Include="..\..\src\GitRun\GitRun.csproj" />
+		<Reference Include="GitRun" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\..\GitRun\src\ProcessGroup\ProcessGroup.csproj" />
 	</ItemGroup>
 
 </Project>

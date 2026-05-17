@@ -6,8 +6,25 @@
 
 		<PackageId>GitRun</PackageId>
 		<Version>1.0.0</Version>
+		<Authors>Anton Zhelezniakou</Authors>
+		<Copyright>Copyright (c) 2026 Anton Zhelezniakou, WiseTech Global. All rights reserved.</Copyright>
 		<Description>Small .NET library for running git commands and streaming their output asynchronously.</Description>
-		<PackageTags>git;async;IAsyncEnumerable</PackageTags>
+		<PackageTags>git</PackageTags>
+		<PackageLicenseFile>LICENSE</PackageLicenseFile>
+		<PackageReadmeFile>README.md</PackageReadmeFile>
+
+		<PackageProjectUrl>https://github.com/AntonZhelezniakou-WTG/git-run</PackageProjectUrl>
+		<RepositoryUrl>https://github.com/AntonZhelezniakou-WTG/git-run</RepositoryUrl>
+		<RepositoryType>git</RepositoryType>
+		<PublishRepositoryUrl>true</PublishRepositoryUrl>
+		<EmbedUntrackedSources>true</EmbedUntrackedSources>
+
+		<IsAotCompatible>true</IsAotCompatible>
+		<IncludeSymbols>true</IncludeSymbols>
+		<SymbolPackageFormat>snupkg</SymbolPackageFormat>
+
+		<Deterministic>true</Deterministic>
+		<ContinuousIntegrationBuild Condition="'$(GITHUB_ACTIONS)' == 'true'">true</ContinuousIntegrationBuild>
 	</PropertyGroup>
 
 	<ItemGroup>
