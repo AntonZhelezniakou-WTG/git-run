@@ -28,7 +28,7 @@
 	</PropertyGroup>
 
 	<ItemGroup>
-	  <ProjectReference Include="..\..\ProcessGroup\src\ProcessGroup\ProcessGroup.csproj" />
+		<PackageReference Include="ProcessGroup" />
 	</ItemGroup>
 
 </Project>

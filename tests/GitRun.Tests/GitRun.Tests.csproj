@@ -21,9 +21,4 @@
 		<Reference Include="GitRun" />
 	</ItemGroup>
 
-	<ItemGroup>
-		<ProjectReference Include="..\..\GitRun\src\ProcessGroup\ProcessGroup.csproj" />
-	</ItemGroup>
-
 </Project>
-
